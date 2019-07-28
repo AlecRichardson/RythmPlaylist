@@ -4,7 +4,8 @@
   "description": "RythmPlaylist is a discord bot that allows users to create and save music playlists. RythmPlaylist will piggy back off of Rythm bots play commands to queue saved playlists.",
   "main": "index.js",
   "dependencies": {
-    "discord.js": "^11.5.1"
+    "discord.js": "^11.5.1",
+    "dotenv": "^8.0.0"
   },
   "devDependencies": {},
   "scripts": {

@@ -6,5 +6,8 @@ const isYtUrl = url => {
     return !!pattern.test(url);
 };
 
+const createUrl = id => `https://www.youtube.com/watch?v=${id}`;
+
 exports.playlistPath = playlistPath;
 exports.isYtUrl = isYtUrl;
+exports.createUrl = createUrl;

@@ -7,6 +7,26 @@ require('dotenv').config();
 
 const utils = require('./utils');
 const constants = require('./constants');
+const api = require('./api');
+
+let servers = {};
+
+let play = (conn, msg) => {
+    let server = servers[msg.guild.id];
+
+    server.dispatcher = conn.playStream(ytdl(server.queue[0], { filter: 'audioonly' }));
+
+    server.queue.shift();
+
+    server.dispatcher.on('end', () => {
+        if (server.queue[0]) play(conn, msg);
+        else conn.disconnect();
+    });
+};
+
+let queue = (url, msg) => {
+    servers[msg.guild.id].queue.push(url);
+};
 
 client.on('ready', () => {
     console.log(`Logged in as ${client.user.tag}!`);
@@ -62,7 +82,8 @@ client.on('message', msg => {
 
     if (_.isEqual(command, `${constants.PREFIX}queue`)) {
         const path = utils.playlistPath(args);
-        let count = 0;
+        let urls = [];
+        // let server = servers[msg.guild.id];
         if (!fs.existsSync(path)) {
             return msg.reply(
                 'A playlist with that name does not exist, try again or create a playlist using\n```/create <playlistName>```'
@@ -74,25 +95,32 @@ client.on('message', msg => {
             .toString()
             .split('\n');
 
-        msg.reply(`Queueing playlist ${args}`);
-        let play = url => {
+        if (!servers[msg.guild.id]) {
+            servers[msg.guild.id] = {
+                queue: []
+            };
+        }
+
+        api.search('yippie').then(res => {
+            servers[msg.guild.id].queue.push(utils.createUrl(res.items[0].id.videoId));
             try {
                 msg.member.voiceChannel.join().then(conn => {
-                    const dispatch = conn.playStream(ytdl(url, { filter: 'audioonly' }));
-                    dispatch.on('end', () => {
-                        play(songs[count++]);
-                    });
+                    play(conn, msg);
                 });
             } catch {
                 console.log('error');
             }
-        };
-
-        play(songs[count++]);
-
-        songs.forEach(song => {
-            msg.channel.send(`::play ${song}\n`);
         });
+
+        console.log('queue: ', servers[msg.guild.id].queue);
+        // msg.reply(`Queueing playlist ${args}`);
+        // try {
+        //     msg.member.voiceChannel.join().then(conn => {
+        //         play(conn, msg);
+        //     });
+        // } catch {
+        //     console.log('error');
+        // }
     }
 
     if (_.isEqual(command, `${constants.PREFIX}join`)) {
@@ -115,21 +143,42 @@ client.on('message', msg => {
     }
 
     if (_.isEqual(command, `${constants.PREFIX}play`)) {
+        let server = servers[msg.guild.id];
         if (utils.isYtUrl(args)) {
             console.log('true');
+            servers[msg.guild.id] = {
+                queue: [args]
+            };
+
+            msg.reply(`Starting song: ${args}`);
             try {
                 msg.member.voiceChannel.join().then(conn => {
-                    const dispatch = conn.playStream(ytdl(args, { filter: 'audioonly' }));
-                    dispatch.on('end', () => {
-                        console.log('Song over.');
-                    });
+                    play(conn, msg);
                 });
             } catch {
                 console.log('error');
             }
         } else {
             console.log('false');
-            // Search using url
+            // Search youtube and play the first result.
+            api.search(args)
+                .then(res => {
+                    console.log('res: ', res);
+                    console.log('id: ', res.items[0].id.videoId);
+                    servers[msg.guild.id] = {
+                        queue: []
+                    };
+                    try {
+                        msg.member.voiceChannel.join().then(conn => {
+                            play(conn, msg);
+                        });
+                    } catch {
+                        console.log('error');
+                    }
+                })
+                .catch(err => {
+                    console.log('err: ', err);
+                });
         }
     }
 });
